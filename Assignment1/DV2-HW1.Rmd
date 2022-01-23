@@ -1,0 +1,123 @@
+---
+title: "Data Vizualization 2 - Homework 1"
+author: "Nawal Zehra Hasan"
+date: "1/16/2022"
+output:
+  html_document:
+    df_print: paged
+  rmarkdown::html_document:
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Q0. Load the nycflights13 package and check what kind of datasets exist in the package, then create a copy of flights dataset into a data.table object, called flight_data.
+
+```{r, message=FALSE, warning=FALSE,include=FALSE}
+#cleaning the environment
+rm(list=ls())
+#loading relevant packages
+library(data.table)
+library(nycflights13)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(rgeos)
+library(rnaturalearthdata)
+library(googleway)
+library(ggrepel)
+
+#load nycflights data
+flight_data <- data.table(nycflights13::flights)
+#check the data type
+class(flight_data) 
+#check the structure
+str(flight_data)
+```
+
+```{r, include=TRUE, message=TRUE, echo=FALSE}
+head(flight_data)
+```
+
+
+## Q1. Which destination had the lowest avg arrival delay from LGA with minimum 100 flight to that destination?
+
+```{r, include=TRUE, message=TRUE, echo=FALSE}
+q1 <- flight_data[origin == 'LGA', list(number_of_flights = .N, 
+                                  mean_arrival_delay = mean(arr_delay, na.rm = T)), 
+            by = dest][order(mean_arrival_delay)]
+
+q1[number_of_flights > 100,][1]
+```
+
+## Q2. Which destination's flights were the most on time (avg arrival delay closest to zero) from LGA with minimum 100 flight to that destination?
+
+```{r, include=TRUE, message=TRUE, echo=FALSE}
+q2 <- q1[number_of_flights > 100, 
+           list(dest, mean_arrival_delay, number_of_flights, 
+                gicu = abs(mean_arrival_delay))][order(gicu)]
+
+q2[, list(dest, number_of_flights, mean_arrival_delay)][1]
+```
+
+## Q3. Who is the manufacturer of the plane, which flights the most to CHS destination?
+
+```{r, , include=TRUE, message=TRUE, echo=FALSE}
+q3 <- flight_data[dest == 'CHS', list(number_flights = .N), 
+                       by = list(tailnum, dest)][order(-number_flights)]
+flight_data_planes <- data.table(nycflights13::planes)
+
+merge(q3, flight_data_planes[, list(tailnum, manufacturer)])[order(-number_flights)][1]
+```
+
+## Q4. Which airline (carrier) flow the most by distance?
+
+```{r, , include=TRUE, message=TRUE, echo=FALSE}
+q4 <- data.table(nycflights13::airlines)
+
+merge(flight_data[, list(total_distance_flown = sum(distance)), 
+            by = carrier][order(-total_distance_flown)][1], q4)
+```
+## Q5. Plot the monthly number of flights with 20+ mins arrival delay!
+
+```{r, message=TRUE, echo=FALSE, fig.width=8, fig.height=5, fig.align='center'}
+q5 <- flight_data[arr_delay > 20, list(date = make_date(year, month))]
+
+ggplot(q5, aes(x = date)) + geom_bar() +
+  labs(y="Number of Flights", x = "Date")
+```
+
+## Q6. Plot the departure delay of flights going to IAH and the related day's wind speed on a scaterplot! Is there any association between the two variables? Try adding a linear model.
+
+```{r,message=FALSE, echo=FALSE, fig.width=8, fig.height=5, fig.align='center', warning=FALSE}
+flights_weather <- data.table(nycflights13::weather)
+
+departure <- flight_data[dest == 'IAH', 
+                       list(dep_delay, origin, dest, year, month, day)]
+weather <- flights_weather[, list(mean_wind_speed = mean(wind_speed)), 
+                               by = list(origin, year, month, day)]
+q6 <- merge(departure, weather)
+
+ggplot(q6, aes(dep_delay, mean_wind_speed)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm') +
+  labs(y="Mean Wind Speed", x = "Departure Delay") +
+  theme_minimal()
+```
+
+## Q7. Plot the airports as per their geolocation on a world map, by mapping the number flights going to that destination to the size of the symbol!
+
+```{r, message=FALSE, echo=FALSE, fig.width=8, fig.height=5, fig.align='center'}
+map <- map_data('world')
+ggplot() +
+  geom_polygon(
+    data = map, aes(x = long, y = lat, group = group), fill = 'gray', color = 'black') +
+  geom_point(
+    data = merge(
+      airports, flight_data[, .(flights = .N), by = .(faa = dest)], by = 'faa'), aes(lon, lat, size = flights)) +
+  theme_minimal() +
+  theme(legend.position = 'top') +
+  xlab('') + ylab('') 
+```
