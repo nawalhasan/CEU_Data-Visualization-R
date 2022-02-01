@@ -1,0 +1,149 @@
+---
+title: "Data Visualization with R - Assignment 2"
+author: "Nawal Zehra Hasan"
+date: "1/24/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+I tried the bonus exercise 1, I could run the code but could not knit is in the html. If you can please run and check it. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+library(data.table)
+library(ggplot2)
+library(gganimate)
+library(tidyr)
+#install.packages('ggmap')
+library(ggmap)
+library(tidygeocoder)
+#install.packages("scatterpie")
+library(scatterpie)
+```
+
+## TASK 1
+```{r, fig.align='center'}
+df <- data.table(readRDS('flats.rds'))
+df1 <- df[,.(Area)]
+
+p1 <- ggplot(df1, aes(x=Area)) + 
+  geom_histogram(bins = 40, color="white", fill="#006D77") +
+  theme_bw() +
+  labs(title = "Distribution of the Area of flats(m2)") +
+  theme(plot.title=element_text(hjust=0.5)) 
+p1
+```
+
+## TASK 2
+```{r, fig.align='center'}
+df2 <- df[!is.na(Condition),.(Price),  by = Condition]
+
+p2 <- ggplot(df2, aes(x=Price, group=Condition, fill=Condition)) + 
+  geom_density(adjust=1, alpha=0.25) +
+  theme_bw() +
+  labs(title = "Price Distribution of Flats in Different Conditions") +
+  theme(plot.title=element_text(hjust=0.5)) 
+p2
+```
+
+## TASK 3
+```{r, warning=FALSE, fig.align='center'}
+df3 <- df[!is.na(Condition),.(Area, Price), by = Condition]
+
+p3 <- ggplot(df3, aes(x=Area, y=Price)) + 
+  geom_point(adjust=0.5, alpha=0.4, color="black") +
+  theme_bw() +
+  geom_smooth(aes(color=Condition), method=lm, se=FALSE, fullrange=TRUE, size=1) +
+  labs(title = "How the condition of the flat effects price to area") +
+  theme(plot.title=element_text(hjust=0.5)) 
+p3
+```
+
+## TASK 4
+```{r, fig.align='center'}
+df4 <- df[,.(Average_Price = mean(Price)), by = District][order(District)]
+
+p4 <- ggplot(df4, aes(x = factor(District), y = Average_Price), fill="#006D77") + 
+  geom_bar(stat = "identity", fill="#006D77") +
+  theme_bw() +
+  labs(x="District", y="Average Price") +
+  theme(plot.title=element_text(hjust=0.5)) 
+p4
+```
+
+## TASK 5
+```{r, fig.align='center'}
+df5 <- df[,.(Price), by = District][order(District)]
+
+p5 <- ggplot(df5, aes(x = factor(District), y = Price)) +
+  geom_boxplot(color="#006D77", fill="#66B7B0", alpha=0.5) +
+  theme_bw() +
+  labs(x="District", y="Price") +
+  theme(plot.title=element_text(hjust=0.5)) 
+p5
+```
+
+## TASK 6
+```{r, fig.align='center'}
+p6 <- ggplot(df5,aes(factor(District), y = Price)) + 
+  geom_violin(color="#006D77", fill="#66B7B0", alpha=0.7) +
+  theme_bw() +
+  labs(x="District", y="Price") +
+  theme(plot.title=element_text(hjust=0.5)) 
+p6
+```
+
+## TASK 7
+```{r, fig.align='center'}
+df6 <- df[,.(Number_of_flats = .N, Price), by = District]
+
+p7 <- ggplot(df6) +
+  geom_histogram(aes(x = Price), fill = "#006D77", color = "#66B7B0") +
+  transition_states(District) +
+  labs(title = paste("District {closest_state}"),
+       subtitle = paste('Number of flats: {nrow(subset(df6, District == closest_state))}
+                     Mean price: {df6[District == closest_state, round(mean(Price))]} ft'))+ 
+  theme_bw()
+p7
+```
+
+## Bonus
+```{r, , warning=FALSE, fig.align='center'}
+# Group by district
+df7 <- df[,.N , by=District ]
+
+for( i in 1:nrow(df6)){
+  df7[i, lat:=geo(city="Budapest", country = "Hungary", street=paste0(df7[i,1],". kerület"))[4]]
+  df7[i, lon:=geo(city="Budapest", country = "Hungary", street=paste0(df7[i,1],". kerület"))[5]]
+  
+}
+  
+# Budapest coordinated 
+budapest = c(left=18.905961, bottom =47.383613, right = 19.206638, top = 47.601857)
+# Plot together
+ggmap(get_stamenmap(budapest, zoom=11,maptype = "toner-2011"))+ 
+  theme_bw()+
+  geom_point(data = df7, aes(x=lon	, y=lat, size=N), color="orange")+
+  theme(
+    legend.position = "none")
+```
+
+## Trial
+```{r, , warning=FALSE, message=FALSE}
+df8 <- df[!is.na(Comfort_lev),.(Count=.N), by=.(District,Comfort_lev)] 
+
+df8 <- df8[Comfort_lev=="luxury",rating := 6]
+df8 <- df[Comfort_lev=="very high",rating := 5]
+df8 <- df8[Comfort_lev=="high",rating := 4]
+df8 <- df8[Comfort_lev=="average",rating := 3]
+df8 <- df8[Comfort_lev=="low",rating := 2]
+df8 <- df8[Comfort_lev=="very low",rating := 1]
+
+df9 <- merge(df7,df8, by = "District")
+
+df8 <- data.table(df8)
+```
